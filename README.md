@@ -2,6 +2,10 @@
 
 ## Start
 
+```
+git submodule update --init --recursive
+```
+
 conda或者python管理环境
 
 ```
@@ -11,6 +15,10 @@ pip3 install torch torchvision torchaudio --index-url https://download.pytorch.o
 cd sam2
 pip install -e .
 pip install opencv-python matplotlib
+
+cd checkpoints && \
+./download_ckpts.sh && \
+cd ..
 ```
 
 输入和输出文件夹
@@ -22,12 +30,13 @@ patterRecognition
 ├── raw
 ├── best_output
 ├── output
-└── sam2
+├── sam2
+└── inference.py
 ```
 
 运行推理
 
 ```
-cd sam2
+export PYTHONPATH="sam2" # 或者最好设置为绝对路径
 python inference.py # 会运行所有在raw中的
 ```
