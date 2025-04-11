@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import os
+import json
 
 checkpoint = "./sam2/checkpoints/sam2.1_hiera_large.pt"
 model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
@@ -55,23 +56,35 @@ def show_masks(image, masks, scores, name="default", point_coords=None, box_coor
             plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
         plt.axis('off')
         if i == 0:
-            plt.savefig(f"best_output/{name}.jpg", bbox_inches='tight')
-        plt.savefig(f"output/{name}_{i+1}.jpg", bbox_inches='tight')
+            plt.savefig(f"new_best_output/{name}.jpg", bbox_inches='tight')
+        plt.savefig(f"new_output/{name}_{i+1}.jpg", bbox_inches='tight')
         plt.close() 
 
 with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-    folder = "raw"
-    image_names = os.listdir(folder)
-    for image_name in image_names:
-        image_path = os.path.join(folder, image_name)
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        predictor.set_image(image)
-        masks, scores, logits = predictor.predict()
-        sorted_ind = np.argsort(scores)[::-1]
-        masks = masks[sorted_ind]
-        scores = scores[sorted_ind]
-        logits = logits[sorted_ind]
-        print(f"finish predict {image_name}")
-        image_name = image_name.split(".")[0]
-        show_masks(image, masks, scores, name=image_name)
+    folder = "final_labeled"
+    file_names = os.listdir(folder)
+    for file_name in file_names:
+        if file_name.endswith('.json'):
+            with open(os.path.join(folder, file_name), 'r', encoding='utf-8') as file:
+                data = json.load(file)
+            image_name = file_name.replace('.json', '.jpg')
+            shapes = data['shapes']
+            for shape in shapes:
+                if shape['label'] == 'KELOID_BODY':
+                    points = shape['points']
+                    array = np.array(points)
+                    break
+            assert array is not None, 'No KELOID_BODY found in {}'.format(file_name)
+            image_path = os.path.join(folder, image_name)
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            predictor.set_image(image)
+            labels = np.ones((array.shape[0],))
+            masks, scores, logits = predictor.predict(point_coords=array, point_labels=labels)
+            sorted_ind = np.argsort(scores)[::-1]
+            masks = masks[sorted_ind]
+            scores = scores[sorted_ind]
+            logits = logits[sorted_ind]
+            print(f"finish predict {image_name}")
+            image_name = image_name.split(".")[0]
+            show_masks(image, masks, scores, name=image_name)
